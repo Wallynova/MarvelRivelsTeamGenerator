@@ -1,0 +1,196 @@
+<script type="text/javascript">
+        var gk_isXlsx = false;
+        var gk_xlsxFileLookup = {};
+        var gk_fileData = {};
+        function filledCell(cell) {
+          return cell !== '' && cell != null;
+        }
+        function loadFileData(filename) {
+        if (gk_isXlsx && gk_xlsxFileLookup[filename]) {
+            try {
+                var workbook = XLSX.read(gk_fileData[filename], { type: 'base64' });
+                var firstSheetName = workbook.SheetNames[0];
+                var worksheet = workbook.Sheets[firstSheetName];
+
+                // Convert sheet to JSON to filter blank rows
+                var jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, blankrows: false, defval: '' });
+                // Filter out blank rows (rows where all cells are empty, null, or undefined)
+                var filteredData = jsonData.filter(row => row.some(filledCell));
+
+                // Heuristic to find the header row by ignoring rows with fewer filled cells than the next row
+                var headerRowIndex = filteredData.findIndex((row, index) =>
+                  row.filter(filledCell).length >= filteredData[index + 1]?.filter(filledCell).length
+                );
+                // Fallback
+                if (headerRowIndex === -1 || headerRowIndex > 25) {
+                  headerRowIndex = 0;
+                }
+
+                // Convert filtered JSON back to CSV
+                var csv = XLSX.utils.aoa_to_sheet(filteredData.slice(headerRowIndex)); // Create a new sheet from filtered array of arrays
+                csv = XLSX.utils.sheet_to_csv(csv, { header: 1 });
+                return csv;
+            } catch (e) {
+                console.error(e);
+                return "";
+            }
+        }
+        return gk_fileData[filename] || "";
+        }
+        </script><!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Marvel Rivals Team Randomizer</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            background-color: #1a202c;
+            color: #e2e8f0;
+            font-family: 'Arial', sans-serif;
+        }
+        .hero-card {
+            transition: transform 0.2s;
+        }
+        .hero-card:hover {
+            transform: scale(1.05);
+        }
+    </style>
+</head>
+<body class="min-h-screen flex items-center justify-center p-4">
+    <div class="max-w-4xl w-full bg-gray-800 rounded-lg shadow-xl p-6">
+        <h1 class="text-3xl font-bold text-center mb-6">Marvel Rivals Team Randomizer</h1>
+        
+        <!-- Input Form -->
+        <div id="input-section" class="mb-8">
+            <p class="text-center mb-4">Enter 6 player names below, then click "Randomize Team" to assign heroes (2 Vanguards, 2 Duelists, 2 Strategists).</p>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+                <input type="text" id="player1" placeholder="Player 1 Name" class="p-2 rounded bg-gray-700 text-white border border-gray-600 focus:outline-none focus:border-blue-500">
+                <input type="text" id="player2" placeholder="Player 2 Name" class="p-2 rounded bg-gray-700 text-white border border-gray-600 focus:outline-none focus:border-blue-500">
+                <input type="text" id="player3" placeholder="Player 3 Name" class="p-2 rounded bg-gray-700 text-white border border-gray-600 focus:outline-none focus:border-blue-500">
+                <input type="text" id="player4" placeholder="Player 4 Name" class="p-2 rounded bg-gray-700 text-white border border-gray-600 focus:outline-none focus:border-blue-500">
+                <input type="text" id="player5" placeholder="Player 5 Name" class="p-2 rounded bg-gray-700 text-white border border-gray-600 focus:outline-none focus:border-blue-500">
+                <input type="text" id="player6" placeholder="Player 6 Name" class="p-2 rounded bg-gray-700 text-white border border-gray-600 focus:outline-none focus:border-blue-500">
+            </div>
+            <button onclick="randomizeTeam()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded transition duration-200">Randomize Team</button>
+        </div>
+
+        <!-- Results Section -->
+        <div id="results" class="hidden grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4"></div>
+    </div>
+
+    <script>
+        // Marvel Rivals Heroes Data (38 characters as of Season 2)
+        const heroes = [
+            { name: "Captain America", class: "Vanguard" },
+            { name: "Doctor Strange", class: "Vanguard" },
+            { name: "Emma Frost", class: "Vanguard" },
+            { name: "Groot", class: "Vanguard" },
+            { name: "Hulk", class: "Vanguard" },
+            { name: "Magneto", class: "Vanguard" },
+            { name: "The Thing", class: "Vanguard" },
+            { name: "Thor", class: "Vanguard" },
+            { name: "Venom", class: "Vanguard" },
+            { name: "Peni Parker", class: "Vanguard" },
+            { name: "Black Panther", class: "Duelist" },
+            { name: "Hawkeye", class: "Duelist" },
+            { name: "Hela", class: "Duelist" },
+            { name: "Human Torch", class: "Duelist" },
+            { name: "Iron Fist", class: "Duelist" },
+            { name: "Iron Man", class: "Duelist" },
+            { name: "Magik", class: "Duelist" },
+            { name: "Mister Fantastic", class: "Duelist" },
+            { name: "Namor", class: "Duelist" },
+            { name: "Psylocke", class: "Duelist" },
+            { name: "Punisher", class: "Duelist" },
+            { name: "Scarlet Witch", class: "Duelist" },
+            { name: "Spider-Man", class: "Duelist" },
+            { name: "Squirrel Girl", class: "Duelist" },
+            { name: "Star-Lord", class: "Duelist" },
+            { name: "Storm", class: "Duelist" },
+            { name: "The Winter Soldier", class: "Duelist" },
+            { name: "Wolverine", class: "Duelist" },
+            { name: "Black Widow", class: "Duelist" },
+            { name: "Adam Warlock", class: "Strategist" },
+            { name: "Cloak & Dagger", class: "Strategist" },
+            { name: "Invisible Woman", class: "Strategist" },
+            { name: "Jeff the Land Shark", class: "Strategist" },
+            { name: "Loki", class: "Strategist" },
+            { name: "Luna Snow", class: "Strategist" },
+            { name: "Mantis", class: "Strategist" },
+            { name: "Rocket Raccoon", class: "Strategist" }
+        ];
+
+        function randomizeTeam() {
+            // Get player names
+            const players = [
+                document.getElementById('player1').value.trim() || 'Player 1',
+                document.getElementById('player2').value.trim() || 'Player 2',
+                document.getElementById('player3').value.trim() || 'Player 3',
+                document.getElementById('player4').value.trim() || 'Player 4',
+                document.getElementById('player5').value.trim() || 'Player 5',
+                document.getElementById('player6').value.trim() || 'Player 6'
+            ];
+
+            // Validate: Ensure at least 6 unique players
+            const uniquePlayers = new Set(players);
+            if (uniquePlayers.size < 6) {
+                alert('Please enter 6 different player names (or leave blank for defaults).');
+                return;
+            }
+
+            // Separate heroes by class
+            const vanguards = heroes.filter(h => h.class === 'Vanguard');
+            const duelists = heroes.filter(h => h.class === 'Duelist');
+            const strategists = heroes.filter(h => h.class === 'Strategist');
+
+            // Shuffle arrays to randomize
+            function shuffle(array) {
+                for (let i = array.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [array[i], array[j]] = [array[j], array[i]];
+                }
+                return array;
+            }
+
+            // Randomly select 2 heroes from each class
+            const selectedVanguards = shuffle([...vanguards]).slice(0, 2);
+            const selectedDuelists = shuffle([...duelists]).slice(0, 2);
+            const selectedStrategists = shuffle([...strategists]).slice(0, 2);
+
+            // Combine selected heroes and shuffle for random assignment
+            const selectedHeroes = [...selectedVanguards, ...selectedDuelists, ...selectedStrategists];
+            shuffle(selectedHeroes);
+
+            // Assign heroes to players
+            const assignments = players.map((player, index) => ({
+                player,
+                hero: selectedHeroes[index].name,
+                class: selectedHeroes[index].class
+            }));
+
+            // Display results
+            const resultsDiv = document.getElementById('results');
+            resultsDiv.innerHTML = '';
+            assignments.forEach(assignment => {
+                const card = document.createElement('div');
+                card.className = 'hero-card bg-gray-900 p-4 rounded-lg shadow-md';
+                card.innerHTML = `
+                    <h3 class="text-xl font-semibold text-blue-400">${assignment.player}</h3>
+                    <p class="text-lg">Hero: <span class="font-bold text-yellow-400">${assignment.hero}</span></p>
+                    <p class="text-lg">Class: <span class="font-bold ${
+                        assignment.class === 'Vanguard' ? 'text-green-400' :
+                        assignment.class === 'Duelist' ? 'text-red-400' : 'text-purple-400'
+                    }">${assignment.class}</span></p>
+                `;
+                resultsDiv.appendChild(card);
+            });
+
+            // Show results and hide input section
+            resultsDiv.classList.remove('hidden');
+            document.getElementById('input-section').classList.add('hidden');
+        }
+    </script>
+</body>
+</html>
